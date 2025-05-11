@@ -2,11 +2,21 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut, User } from "lucide-react";
 import AnimatedLogo from "./ui/AnimatedLogo";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -39,9 +49,35 @@ const Header: React.FC = () => {
               {item.label}
             </Link>
           ))}
-          <Button className="bg-comic-purple hover:bg-opacity-90">
-            Get Started
-          </Button>
+          
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="rounded-full w-10 h-10 p-0">
+                  <User className="h-4 w-4" />
+                  <span className="sr-only">User menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>
+                  {user.email}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/workspace">My Comics</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut()}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button className="bg-comic-purple hover:bg-opacity-90" asChild>
+              <Link to="/auth">Get Started</Link>
+            </Button>
+          )}
         </nav>
 
         {/* Mobile Menu Button */}
@@ -74,9 +110,27 @@ const Header: React.FC = () => {
               </li>
             ))}
             <li>
-              <Button className="w-full bg-comic-purple hover:bg-opacity-90">
-                Get Started
-              </Button>
+              {user ? (
+                <Button 
+                  variant="outline" 
+                  className="w-full flex items-center justify-center"
+                  onClick={() => {
+                    signOut();
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </Button>
+              ) : (
+                <Button 
+                  className="w-full bg-comic-purple hover:bg-opacity-90"
+                  onClick={() => setIsMenuOpen(false)}
+                  asChild
+                >
+                  <Link to="/auth">Get Started</Link>
+                </Button>
+              )}
             </li>
           </ul>
         </nav>
