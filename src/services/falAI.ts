@@ -5,8 +5,9 @@ import * as fal from '@fal-ai/serverless-client';
 fal.config({
   // These would typically come from environment variables
   credentials: {
-    key: 'your-fal-key',  // This should be replaced with user input in production
-    secret: 'your-fal-secret', // This should be replaced with user input in production
+    // Using the correct property names based on the @fal-ai/serverless-client types
+    clientId: 'your-fal-key',  // This should be replaced with user input in production
+    clientSecret: 'your-fal-secret', // This should be replaced with user input in production
   },
 });
 
@@ -23,10 +24,17 @@ export interface ComicPanelResult {
   seed: number;
 }
 
+// Define the expected response structure from Fal AI
+interface FalAIResponse {
+  images: { url: string }[];
+  seed: number;
+}
+
 export const generateComicPanel = async (
   params: ComicPanelGenerationParams
 ): Promise<ComicPanelResult> => {
   try {
+    // Type the response properly
     const response = await fal.run('fal-ai/fast-sdxl', {
       input: {
         prompt: params.prompt,
@@ -35,7 +43,7 @@ export const generateComicPanel = async (
         height: params.height || 768,
         num_inference_steps: params.numInferenceSteps || 25,
       },
-    });
+    }) as FalAIResponse; // Cast the response to our interface
 
     return {
       imageUrl: response.images[0].url,
