@@ -4,7 +4,9 @@ import AIPromptPanel from "./AIPromptPanel";
 import ComicPreview from "./ComicPreview";
 import PanelManager from "./PanelManager";
 import WelcomeModal from "../onboarding/WelcomeModal";
+import HistoricalComicGenerator from "./HistoricalComicGenerator";
 import { useToast } from "@/components/ui/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ComicPanel {
   id: string;
@@ -16,6 +18,7 @@ interface ComicPanel {
 const ComicWorkspace: React.FC = () => {
   const [panels, setPanels] = useState<ComicPanel[]>([]);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [activeTab, setActiveTab] = useState<string>("standard");
   const { toast } = useToast();
 
   const sampleImages = [
@@ -94,16 +97,29 @@ const ComicWorkspace: React.FC = () => {
     <div className="container mx-auto py-8 px-4">
       <h1 className="text-2xl md:text-3xl font-bold mb-6">Comic Creator Workspace</h1>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-6">
-          <AIPromptPanel onGenerate={handleGenerate} />
-          <PanelManager />
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="standard">Standard Comic</TabsTrigger>
+          <TabsTrigger value="historical">Historical Ottoman Empire</TabsTrigger>
+        </TabsList>
         
-        <div className="lg:col-span-2">
-          <ComicPreview panels={panels} onRemovePanel={handleRemovePanel} />
-        </div>
-      </div>
+        <TabsContent value="standard" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-6">
+              <AIPromptPanel onGenerate={handleGenerate} />
+              <PanelManager />
+            </div>
+            
+            <div className="lg:col-span-2">
+              <ComicPreview panels={panels} onRemovePanel={handleRemovePanel} />
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="historical" className="mt-6">
+          <HistoricalComicGenerator />
+        </TabsContent>
+      </Tabs>
       
       <WelcomeModal isOpen={showWelcome} onClose={handleCloseWelcome} />
     </div>
