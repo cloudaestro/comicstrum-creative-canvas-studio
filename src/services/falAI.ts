@@ -5,9 +5,9 @@ import * as fal from '@fal-ai/serverless-client';
 fal.config({
   // These would typically come from environment variables
   credentials: {
-    // Using the correct property names for @fal-ai/serverless-client
-    clientId: 'your-fal-key',  // This should be replaced with user input in production
-    clientSecret: 'your-fal-secret', // This should be replaced with user input in production
+    // Using the correct property names for the @fal-ai/serverless-client
+    key: 'your-fal-key',  // This should be replaced with user input in production
+    secret: 'your-fal-secret', // This should be replaced with user input in production
   },
 });
 
