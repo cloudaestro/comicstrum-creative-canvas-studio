@@ -1,11 +1,7 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@12.4.0?target=deno";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2022-11-15",
-});
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import Stripe from "https://esm.sh/stripe@14.21.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,101 +11,99 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: corsHeaders,
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
+  // Create Supabase client using the anon key for user authentication
+  const supabaseClient = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+  );
+
   try {
-    // Create authenticated Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Get the authorization header from the request
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("Missing Authorization header");
-    }
-
-    // Verify auth token and get user
+    // Verify authentication
+    const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      throw new Error("Invalid authorization");
+    const { data } = await supabaseClient.auth.getUser(token);
+    const user = data.user;
+    if (!user?.email) throw new Error("User not authenticated or email not available");
+
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2023-10-16",
+    });
+
+    // Get request body
+    const { priceId, mode } = await req.json();
+    if (!priceId) throw new Error("Price ID is required");
+
+    // Check if user already has a Stripe customer account
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    let customerId;
+    if (customers.data.length > 0) {
+      customerId = customers.data[0].id;
     }
 
-    // Get request data
-    const { priceId, mode = "subscription" } = await req.json();
+    // Set up price data based on plan
+    let priceData;
+    let subscriptionMode = mode || "subscription";
     
-    // Map price IDs to actual Stripe price IDs
-    // In a real implementation, these would be stored in a database
-    const priceMap: Record<string, string> = {
-      "pro_monthly": "price_1OKnXXXXXXXXXXXXXXXXXXXX", // Replace with actual Stripe price IDs
-      "pro_annual": "price_1OKnYYYYYYYYYYYYYYYYYYYY",   // Replace with actual Stripe price IDs
-      "enterprise_monthly": "price_1OKnZZZZZZZZZZZZZZZZZZZZ", // Replace with actual Stripe price IDs
-      "enterprise_annual": "price_1OKnaAAAAAAAAAAAAAAAAA",    // Replace with actual Stripe price IDs
-    };
-    
-    // Get the actual Stripe price ID
-    const stripePriceId = priceMap[priceId];
-    if (!stripePriceId) {
+    if (priceId === "pro_monthly") {
+      priceData = {
+        currency: "usd",
+        product_data: { name: "Pro Plan - Monthly" },
+        unit_amount: 1900, // $19.00
+        recurring: { interval: "month" }
+      };
+    } else if (priceId === "pro_annual") {
+      priceData = {
+        currency: "usd",
+        product_data: { name: "Pro Plan - Annual" },
+        unit_amount: 19000, // $190.00
+        recurring: { interval: "year" }
+      };
+    } else if (priceId === "enterprise_monthly") {
+      priceData = {
+        currency: "usd",
+        product_data: { name: "Enterprise Plan - Monthly" },
+        unit_amount: 4900, // $49.00
+        recurring: { interval: "month" }
+      };
+    } else if (priceId === "enterprise_annual") {
+      priceData = {
+        currency: "usd",
+        product_data: { name: "Enterprise Plan - Annual" },
+        unit_amount: 49000, // $490.00
+        recurring: { interval: "year" }
+      };
+    } else {
       throw new Error("Invalid price ID");
     }
 
-    // Check if user already has a Stripe customer ID
-    let { data: customers } = await supabase
-      .from("stripe_customers")
-      .select("customer_id")
-      .eq("user_id", user.id)
-      .limit(1);
-    
-    let customerId: string | undefined = customers?.[0]?.customer_id;
-    
-    // If no customer record exists, create one in Stripe
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: {
-          supabase_id: user.id,
-        },
-      });
-      
-      customerId = customer.id;
-      
-      // Save the new customer ID in Supabase
-      await supabase
-        .from("stripe_customers")
-        .insert({
-          user_id: user.id,
-          customer_id: customerId,
-        });
-    }
-
-    // Create a Stripe checkout session
+    // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
+      customer_email: customerId ? undefined : user.email,
       line_items: [
         {
-          price: stripePriceId,
+          price_data: priceData,
           quantity: 1,
         },
       ],
-      mode,
-      success_url: `${req.headers.get("origin")}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      mode: subscriptionMode,
+      success_url: `${req.headers.get("origin")}/payment-success`,
       cancel_url: `${req.headers.get("origin")}/pricing`,
     });
 
-    // Return the session URL
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
+    console.error("Checkout error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
+      status: 500,
     });
   }
 });

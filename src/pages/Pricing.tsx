@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useSupabaseClient } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import PricingCard from "@/components/pricing/PricingCard";
 import PricingHeader from "@/components/pricing/PricingHeader";
 import PricingToggle from "@/components/pricing/PricingToggle";
@@ -72,7 +72,6 @@ export default function Pricing() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const supabase = useSupabaseClient();
 
   const handleSubscription = async (planId: string) => {
     // Don't process payment for free tier
